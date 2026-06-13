@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeonGrid Tetris - Arcade Classic</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        neon: {
+                            cyan: '#06b6d4',
+                            yellow: '#eab308',
+                            purple: '#a855f7',
+                            green: '#22c55e',
+                            red: '#ef4444',
+                            blue: '#3b82f6',
+                            orange: '#f97316'
+                        }
+                    },
+                    boxShadow: {
+                        'neon-glow': '0 0 15px rgba(124, 58, 237, 0.5)',
+                        'glass-dark': '0 8px 32px 0 rgba(0, 0, 0, 0.4)'
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .retro-font {
+            font-family: 'Share Tech Mono', monospace;
+        }
+        canvas {
+            image-rendering: pixelated;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 dark:bg-slate-950 min-h-screen flex flex-col items-center justify-between p-3 sm:p-6 select-none overflow-x-hidden">
+
+    <!-- Header Section -->
+    <header class="w-full max-w-4xl flex items-center justify-between py-3 px-4 mb-4 bg-slate-800/40 dark:bg-slate-900/40 backdrop-blur-md rounded-2xl border border-slate-700/30">
+        <div class="flex items-center gap-3">
+            <div class="p-2 bg-purple-600 text-white rounded-xl shadow-lg shadow-purple-500/30 animate-pulse">
+                <i data-lucide="grid-3x3" class="w-5 h-5"></i>
+            </div>
+            <div>
+                <span class="font-extrabold text-lg tracking-wider bg-gradient-to-r from-purple-400 via-pink-500 to-cyan-400 bg-clip-text text-transparent uppercase">NeonGrid</span>
+                <span class="text-xs text-slate-400 block font-semibold leading-none">Retro Tetris</span>
+            </div>
+        </div>
+        
+        <div class="flex items-center gap-2">
+            <!-- Audio Toggle -->
+            <button id="soundToggle" onclick="toggleAudio()" class="p-2.5 rounded-xl bg-slate-700/50 hover:bg-slate-700 text-slate-300 hover:scale-105 active:scale-95 transition-all" title="Toggle Sound">
+                <i id="soundIcon" data-lucide="volume-2" class="w-4 h-4"></i>
+            </button>
+            <!-- Help Trigger -->
+            <button onclick="toggleHelpModal(true)" class="p-2.5 rounded-xl bg-slate-700/50 hover:bg-slate-700 text-slate-300 hover:scale-105 active:scale-95 transition-all" title="Instructions">
+                <i data-lucide="help-circle" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Board Grid -->
+    <main class="w-full max-w-4xl grid grid-cols-1 md:grid-cols-12 gap-4 lg:gap-6 flex-grow items-start justify-center">
+        
+        <!-- Left Column: Hold & Control States -->
+        <div class="md:col-span-3 flex md:flex-col gap-3 justify-between md:justify-start w-full">
+            <!-- Hold Block Container -->
+            <div class="flex-1 bg-slate-800/30 dark:bg-slate-900/50 backdrop-blur-md border border-slate-700/30 rounded-2xl p-4 text-center">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Hold Queue</h3>
+                <div class="flex justify-center items-center h-20 sm:h-24">
+                    <canvas id="holdCanvas" width="96" height="96" class="bg-slate-950/40 rounded-xl border border-slate-800"></canvas>
+                </div>
+            </div>
+
+            <!-- Dashboard Stats Container -->
+            <div class="flex-1 md:flex-none bg-slate-800/30 dark:bg-slate-900/50 backdrop-blur-md border border-slate-700/30 rounded-2xl p-4 flex flex-col justify-around gap-2.5">
+                <div>
+                    <div class="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Score</div>
+                    <div id="scoreVal" class="text-2xl sm:text-3xl font-bold retro-font text-purple-400 leading-tight">00000</div>
+                </div>
+                <div>
+                    <div class="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Lines Cleared</div>
+                    <div id="linesVal" class="text-lg sm:text-xl font-bold retro-font text-cyan-400 leading-none">0</div>
+                </div>
+                <div class="flex justify-between items-end border-t border-slate-800/60 pt-2">
+                    <div>
+                        <div class="text-[10px] font-bold uppercase text-slate-500 tracking-wider">Level</div>
+                        <div id="levelVal" class="text-sm font-bold text-yellow-400 leading-none">1</div>
+                    </div>
+                    <div>
+                        <div class="text-[10px] font-bold uppercase text-slate-500 tracking-wider">High Score</div>
+                        <div id="highScoreVal" class="text-sm font-bold text-slate-300 leading-none">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center Column: Primary Tetris Board Grid Matrix -->
+        <div class="md:col-span-6 flex flex-col items-center justify-center w-full">
+            <div class="relative bg-slate-950 border-4 border-slate-800 rounded-2xl shadow-neon-glow overflow-hidden w-full max-w-[320px]">
+                <!-- Main Canvas Element -->
+                <canvas id="tetrisCanvas" width="240" height="480" class="w-full h-auto block"></canvas>
+
+                <!-- Game Over overlay -->
+                <div id="gameOverScreen" class="absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center gap-4 text-center hidden px-6">
+                    <div class="p-3 bg-red-500/10 rounded-2xl border border-red-500/30">
+                        <i data-lucide="skull" class="w-10 h-10 text-red-500 animate-bounce"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-2xl font-black uppercase text-red-500 tracking-widest leading-none">Game Over</h2>
+                        <p class="text-xs text-slate-400 mt-1">Excellent try! Your grid locked out.</p>
+                    </div>
+                    <button onclick="startGame()" class="px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-bold text-sm tracking-wider uppercase shadow-lg shadow-purple-500/20 transition-all">Play Again</button>
+                </div>
+
+                <!-- Game Pause overlay -->
+                <div id="gamePauseScreen" class="absolute inset-0 bg-slate-950/85 flex flex-col items-center justify-center gap-4 text-center hidden">
+                    <div class="p-3 bg-cyan-500/10 rounded-2xl border border-cyan-500/30">
+                        <i data-lucide="pause" class="w-10 h-10 text-cyan-400"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-2xl font-black uppercase text-cyan-400 tracking-widest leading-none">Paused</h2>
+                        <p class="text-xs text-slate-400 mt-1">Take a deep breath and jump back in.</p>
+                    </div>
+                    <button onclick="togglePause()" class="px-6 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-600 active:scale-95 text-slate-950 font-bold text-sm tracking-wider uppercase transition-all">Resume Game</button>
+                </div>
+
+                <!-- Intro / Start Splash Screen Overlay -->
+                <div id="startScreen" class="absolute inset-0 bg-slate-950 flex flex-col items-center justify-center gap-6 text-center px-4">
+                    <div class="space-y-1">
+                        <h1 class="text-3xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-br from-cyan-400 to-purple-500 leading-none">TETRIS</h1>
+                        <p class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Standard 10x20 Matrix Rules</p>
+                    </div>
+                    <button onclick="startGame()" class="w-48 py-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold rounded-2xl shadow-xl shadow-purple-500/20 transition-all transform active:scale-95 uppercase tracking-wide">Start Game</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Next Piece Preview & Game Controls Actions -->
+        <div class="md:col-span-3 flex md:flex-col gap-3 justify-between md:justify-start w-full">
+            <!-- Next Preview Block -->
+            <div class="flex-1 bg-slate-800/30 dark:bg-slate-900/50 backdrop-blur-md border border-slate-700/30 rounded-2xl p-4 text-center">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Next Block</h3>
+                <div class="flex justify-center items-center h-20 sm:h-24">
+                    <canvas id="nextCanvas" width="96" height="96" class="bg-slate-950/40 rounded-xl border border-slate-800"></canvas>
+                </div>
+            </div>
+
+            <!-- State Control buttons -->
+            <div class="flex-1 md:flex-none flex flex-col gap-2">
+                <button id="pauseBtn" onclick="togglePause()" class="w-full py-2.5 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/30 rounded-xl text-xs font-semibold uppercase flex items-center justify-center gap-2 text-slate-300">
+                    <i data-lucide="pause-circle" class="w-4 h-4"></i>
+                    <span>Pause</span>
+                </button>
+                <button onclick="resetGame()" class="w-full py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-xl text-xs font-semibold uppercase flex items-center justify-center gap-2 text-red-400">
+                    <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                    <span>Reset</span>
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- On-Screen Virtual Touch Gamepad (Responsive layout, hidden dynamically if preferred but default available for mobile screens) -->
+    <section class="w-full max-w-lg mt-4 px-3 py-2 bg-slate-900/50 backdrop-blur-md border border-slate-800 rounded-3xl grid grid-cols-12 gap-2 shadow-inner">
+        <!-- Directional Pad -->
+        <div class="col-span-7 grid grid-cols-3 gap-2 p-1">
+            <div></div>
+            <!-- Rotate -->
+            <button onclick="triggerKeyAction('ArrowUp')" class="p-3.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 border border-slate-700/30 rounded-2xl flex items-center justify-center transition-all shadow" aria-label="Rotate">
+                <i data-lucide="rotate-cw" class="w-5 h-5 text-yellow-400"></i>
+            </button>
+            <div></div>
+
+            <!-- Left -->
+            <button onclick="triggerKeyAction('ArrowLeft')" class="p-3.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 border border-slate-700/30 rounded-2xl flex items-center justify-center transition-all shadow" aria-label="Move Left">
+                <i data-lucide="arrow-left" class="w-5 h-5"></i>
+            </button>
+            <!-- Down -->
+            <button onclick="triggerKeyAction('ArrowDown')" class="p-3.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 border border-slate-700/30 rounded-2xl flex items-center justify-center transition-all shadow" aria-label="Soft Drop">
+                <i data-lucide="arrow-down" class="w-5 h-5"></i>
+            </button>
+            <!-- Right -->
+            <button onclick="triggerKeyAction('ArrowRight')" class="p-3.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 border border-slate-700/30 rounded-2xl flex items-center justify-center transition-all shadow" aria-label="Move Right">
+                <i data-lucide="arrow-right" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <!-- Utility Action Buttons -->
+        <div class="col-span-5 flex flex-col gap-2 justify-center pl-1">
+            <!-- Hard Drop -->
+            <button onclick="triggerKeyAction(' ')" class="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-95 text-white border border-purple-500/30 rounded-2xl flex items-center justify-center gap-1.5 font-bold text-xs uppercase shadow transition-all">
+                <i data-lucide="zap" class="w-4 h-4 text-yellow-300"></i>
+                <span>Hard Drop</span>
+            </button>
+            <!-- Swap / Hold Queue -->
+            <button onclick="triggerKeyAction('c')" class="w-full py-3 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 border border-slate-700/30 rounded-2xl flex items-center justify-center gap-1.5 font-semibold text-xs uppercase shadow transition-all">
+                <i data-lucide="refresh-cw" class="w-4 h-4 text-cyan-400"></i>
+                <span>Hold Swp</span>
+            </button>
+        </div>
+    </section>
+
+    <!-- Interactive Help Modal Backdrop -->
+    <div id="helpModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 hidden">
+        <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl p-6 relative">
+            <button onclick="toggleHelpModal(false)" class="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-100 rounded-xl bg-slate-800/50 hover:bg-slate-800">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+            <div class="flex items-center gap-2 mb-4">
+                <i data-lucide="keyboard" class="w-5 h-5 text-purple-400"></i>
+                <h3 class="text-lg font-bold">Game Controls</h3>
+            </div>
+            <div class="space-y-3.5 text-sm text-slate-300">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                    <span class="font-medium">Move Left / Right</span>
+                    <kbd class="px-2 py-1 bg-slate-800 border border-slate-700 rounded-md text-xs font-mono text-slate-100">&larr; / &rarr;</kbd>
+                </div>
+                <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                    <span class="font-medium">Rotate Clockwise</span>
+                    <kbd class="px-2 py-1 bg-slate-800 border border-slate-700 rounded-md text-xs font-mono text-slate-100">&uarr; or X</kbd>
+                </div>
+                <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                    <span class="font-medium">Soft Drop</span>
+                    <kbd class="px-2 py-1 bg-slate-800 border border-slate-700 rounded-md text-xs font-mono text-slate-100">&darr;</kbd>
+                </div>
+                <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                    <span class="font-medium">Hard Drop</span>
+                    <kbd class="px-3 py-1 bg-slate-800 border border-slate-700 rounded-md text-xs font-mono text-slate-100">Space</kbd>
+                </div>
+                <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                    <span class="font-medium">Hold Queue Swap</span>
+                    <kbd class="px-2 py-1 bg-slate-800 border border-slate-700 rounded-md text-xs font-mono text-slate-100">C or Shift</kbd>
+                </div>
+                <div class="flex justify-between items-center pb-2">
+                    <span class="font-medium">Pause / Resume</span>
+                    <kbd class="px-2 py-1 bg-slate-800 border border-slate-700 rounded-md text-xs font-mono text-slate-100">Esc or P</kbd>
+                </div>
+            </div>
+            <button onclick="toggleHelpModal(false)" class="mt-6 w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-2xl uppercase text-xs tracking-wider transition-all">Got it</button>
+        </div>
+    </div>
+
+    <!-- Retro Audio Synthesizer Class (Standalone, high compatibility API setup) -->
+    <script>
+        class SoundFX {
+            constructor() {
+                this.enabled = true;
+                this.ctx = null;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+
+            beep(freq, duration, type = "sine", volume = 0.1) {
+                if (!this.enabled) return;
+                this.init();
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    
+                    gain.gain.setValueAtTime(volume, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+                    
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch(e) {
+                    console.log("Audio not allowed yet by user interaction context");
+                }
+            }
+
+            playMove() {
+                this.beep(220, 0.08, "triangle", 0.15);
+            }
+
+            playRotate() {
+                this.beep(440, 0.08, "triangle", 0.15);
+            }
+
+            playClear() {
+                this.beep(587.33, 0.15, "sine", 0.2);
+                setTimeout(() => {
+                    this.beep(880, 0.2, "sine", 0.2);
+                }, 100);
+            }
+
+            playLevelUp() {
+                this.beep(523.25, 0.15, "square", 0.1);
+                setTimeout(() => this.beep(659.25, 0.15, "square", 0.1), 120);
+                setTimeout(() => this.beep(783.99, 0.15, "square", 0.1), 240);
+                setTimeout(() => this.beep(1046.50, 0.3, "square", 0.1), 360);
+            }
+
+            playGameOver() {
+                this.beep(392.00, 0.3, "sawtooth", 0.15);
+                setTimeout(() => this.beep(349.23, 0.3, "sawtooth", 0.15), 300);
+                setTimeout(() => this.beep(293.66, 0.3, "sawtooth", 0.15), 600);
+                setTimeout(() => this.beep(220.00, 0.6, "sawtooth", 0.15), 900);
+            }
+        }
+
+        const SFX = new SoundFX();
+
+        function toggleAudio() {
+            SFX.enabled = !SFX.enabled;
+            const icon = document.getElementById("soundIcon");
+            if (SFX.enabled) {
+                icon.setAttribute("data-lucide", "volume-2");
+            } else {
+                icon.setAttribute("data-lucide", "volume-x");
+            }
+            lucide.createIcons();
+        }
+    </script>
+
+    <!-- Core Game Controller Script Logic -->
+    <script>
+        // Matrix Configuration
+        const COLS = 10;
+        const ROWS = 20;
+        const BLOCK_SIZE = 24; // Pixel size mapped logically inside canvas rendering paths
+        
+        const canvas = document.getElementById("tetrisCanvas");
+        const ctx = canvas.getContext("2d");
+        const nextCanvas = document.getElementById("nextCanvas");
+        const nextCtx = nextCanvas.getContext("2d");
+        const holdCanvas = document.getElementById("holdCanvas");
+        const holdCtx = holdCanvas.getContext("2d");
+
+        // Game State Variables
+        let grid = createGrid();
+        let score = 0;
+        let lines = 0;
+        let level = 1;
+        let highScore = 0;
+        let gameOver = false;
+        let isPaused = false;
+        let hasSwapped = false; // Prevents double hold queue switches in same turn cycle
+
+        let dropCounter = 0;
+        let dropInterval = 1000; // Milliseconds based on current Level
+        let lastTime = 0;
+
+        // Colors mapping of various pieces matching glowing modern Neon aesthetics
+        const COLORS = {
+            'I': '#06b6d4', // Cyan
+            'O': '#eab308', // Yellow
+            'T': '#a855f7', // Purple
+            'S': '#22c55e', // Green
+            'Z': '#ef4444', // Red
+            'J': '#3b82f6', // Blue
+            'L': '#f97316'  // Orange
+        };
+
+        // Definitions of standard forms of shapes (Tetromino matrices)
+        const SHAPES = {
+            'I': [
+                [0, 1, 0, 0],
+                [0, 1, 0, 0],
+                [0, 1, 0, 0],
+                [0, 1, 0, 0]
+            ],
+            'O': [
+                [1, 1],
+                [1, 1]
+            ],
+            'T': [
+                [0, 1, 0],
+                [1, 1, 1],
+                [0, 0, 0]
+            ],
+            'S': [
+                [0, 1, 1],
+                [1, 1, 0],
+                [0, 0, 0]
+            ],
+            'Z': [
+                [1, 1, 0],
+                [0, 1, 1],
+                [0, 0, 0]
+            ],
+            'J': [
+                [0, 1, 0],
+                [0, 1, 0],
+                [1, 1, 0]
+            ],
+            'L': [
+                [0, 1, 0],
+                [0, 1, 0],
+                [0, 1, 1]
+            ]
+        };
+
+        // Current & next parameters
+        let playerPiece = null;
+        let nextPiece = null;
+        let heldPieceType = null; // Storing block character symbol ('I', 'O', etc.)
+
+        function createGrid() {
+            const arr = [];
+            for (let r = 0; r < ROWS; r++) {
+                arr.push(new Array(COLS).fill(0));
+            }
+            return arr;
+        }
+
+        class Piece {
+            constructor(type) {
+                this.type = type;
+                this.matrix = SHAPES[type];
+                this.color = COLORS[type];
+                // Spawn position (centered horizontally at the top of the board)
+                this.x = Math.floor((COLS - this.matrix[0].length) / 2);
+                this.y = 0;
+            }
+        }
+
+        // Generate dynamic piece with randomized uniform distributions
+        function getRandomPiece() {
+            const keys = Object.keys(SHAPES);
+            const randKey = keys[Math.floor(Math.random() * keys.length)];
+            return new Piece(randKey);
+        }
+
+        // Initialize UI display parameters
+        document.addEventListener("DOMContentLoaded", () => {
+            lucide.createIcons();
+            loadHighScore();
+            drawEmptyBoxes();
+        });
+
+        function loadHighScore() {
+            const val = localStorage.getItem("tetris_highscore");
+            if (val) {
+                highScore = parseInt(val);
+                document.getElementById("highScoreVal").innerText = highScore;
+            }
+        }
+
+        function saveHighScore() {
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem("tetris_highscore", highScore.toString());
+                document.getElementById("highScoreVal").innerText = highScore;
+            }
+        }
+
+        function drawEmptyBoxes() {
+            // Draw simple black background for small canvas objects on initial loads
+            nextCtx.fillStyle = '#020617';
+            nextCtx.fillRect(0, 0, nextCanvas.width, nextCanvas.height);
+            holdCtx.fillStyle = '#020617';
+            holdCtx.fillRect(0, 0, holdCanvas.width, holdCanvas.height);
+        }
+
+        function startGame() {
+            // Setup and trigger Audio Context
+            SFX.init();
+
+            document.getElementById("startScreen").classList.add("hidden");
+            document.getElementById("gameOverScreen").classList.add("hidden");
+            
+            grid = createGrid();
+            score = 0;
+            lines = 0;
+            level = 1;
+            dropInterval = 1000;
+            gameOver = false;
+            isPaused = false;
+            heldPieceType = null;
+            hasSwapped = false;
+
+            updateScoreboards();
+
+            playerPiece = getRandomPiece();
+            nextPiece = getRandomPiece();
+
+            drawNextPiece();
+            drawHeldPiece();
+
+            lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function resetGame() {
+            startGame();
+        }
+
+        function togglePause() {
+            if (gameOver) return;
+            isPaused = !isPaused;
+            
+            const screen = document.getElementById("gamePauseScreen");
+            const pBtn = document.getElementById("pauseBtn");
+            
+            if (isPaused) {
+                screen.classList.remove("hidden");
+                pBtn.innerHTML = `<i data-lucide="play-circle" class="w-4 h-4"></i><span>Resume</span>`;
+            } else {
+                screen.classList.add("hidden");
+                pBtn.innerHTML = `<i data-lucide="pause-circle" class="w-4 h-4"></i><span>Pause</span>`;
+                lastTime = performance.now();
+                requestAnimationFrame(gameLoop);
+            }
+            lucide.createIcons();
+        }
+
+        function toggleHelpModal(show) {
+            const modal = document.getElementById("helpModal");
+            if (show) {
+                modal.classList.remove("hidden");
+            } else {
+                modal.classList.add("hidden");
+            }
+        }
+
+        // Major game pipeline execution loop
+        function gameLoop(time = 0) {
+            if (gameOver || isPaused) return;
+
+            const deltaTime = time - lastTime;
+            lastTime = time;
+
+            dropCounter += deltaTime;
+            if (dropCounter > dropInterval) {
+                dropActivePiece();
+            }
+
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function draw() {
+            // Primary Board Canvas paint
+            ctx.fillStyle = "#020617"; // Slate 950 deep dark background
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Grid Lines (thin arcade guides)
+            ctx.strokeStyle = "rgba(51, 65, 85, 0.15)"; // slate-700
+            ctx.lineWidth = 1;
+            for (let x = 0; x < canvas.width; x += BLOCK_SIZE) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += BLOCK_SIZE) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+
+            // Draw Locked Grid blocks
+            drawGrid();
+
+            // Draw ghost piece path projection guide (Helps players aim drop precision)
+            drawGhostPiece();
+
+            // Draw Active Piece blocks
+            if (playerPiece) {
+                drawPiece(ctx, playerPiece, playerPiece.x, playerPiece.y);
+            }
+        }
+
+        function drawGrid() {
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const block = grid[r][c];
+                    if (block !== 0) {
+                        drawBlock(ctx, c, r, block);
+                    }
+                }
+            }
+        }
+
+        function drawBlock(context, x, y, colorCode) {
+            // Neon Block paint with glossy gradient
+            const px = x * BLOCK_SIZE;
+            const py = y * BLOCK_SIZE;
+
+            // Fill color
+            context.fillStyle = colorCode;
+            context.fillRect(px + 1, py + 1, BLOCK_SIZE - 2, BLOCK_SIZE - 2);
+
+            // Inner light shine
+            context.fillStyle = "rgba(255, 255, 255, 0.25)";
+            context.fillRect(px + 2, py + 2, BLOCK_SIZE - 4, 3);
+            
+            // Outer neon box stroke shadow effect
+            context.strokeStyle = "rgba(0, 0, 0, 0.3)";
+            context.lineWidth = 1.5;
+            context.strokeRect(px + 1, py + 1, BLOCK_SIZE - 2, BLOCK_SIZE - 2);
+        }
+
+        function drawPiece(context, piece, offsetX, offsetY, customColor = null) {
+            const color = customColor || piece.color;
+            for (let r = 0; r < piece.matrix.length; r++) {
+                for (let c = 0; c < piece.matrix[r].length; c++) {
+                    if (piece.matrix[r][c] !== 0) {
+                        drawBlock(context, offsetX + c, offsetY + r, color);
+                    }
+                }
+            }
+        }
+
+        function drawGhostPiece() {
+            if (!playerPiece) return;
+            
+            // Project where the active block will land
+            let ghostY = playerPiece.y;
+            while (!checkCollision(playerPiece.matrix, playerPiece.x, ghostY + 1)) {
+                ghostY++;
+            }
+
+            // Draw with faded outline stroke neon color
+            for (let r = 0; r < playerPiece.matrix.length; r++) {
+                for (let c = 0; c < playerPiece.matrix[r].length; c++) {
+                    if (playerPiece.matrix[r][c] !== 0) {
+                        const px = (playerPiece.x + c) * BLOCK_SIZE;
+                        const py = (ghostY + r) * BLOCK_SIZE;
+
+                        ctx.strokeStyle = playerPiece.color;
+                        ctx.lineWidth = 2;
+                        // Draw empty dash outlines for ghost representation
+                        ctx.strokeRect(px + 3, py + 3, BLOCK_SIZE - 6, BLOCK_SIZE - 6);
+                        ctx.fillStyle = "rgba(0,0,0,0.1)";
+                        ctx.fillRect(px + 3, py + 3, BLOCK_SIZE - 6, BLOCK_SIZE - 6);
+                    }
+                }
+            }
+        }
+
+        function drawNextPiece() {
+            nextCtx.fillStyle = '#020617';
+            nextCtx.fillRect(0, 0, nextCanvas.width, nextCanvas.height);
+
+            if (!nextPiece) return;
+
+            // Centers the block within the small preview Canvas
+            const matrix = nextPiece.matrix;
+            const size = matrix.length;
+            const scale = 20; // smaller block size inside preview
+
+            const offsetX = (nextCanvas.width - (matrix[0].length * scale)) / 2;
+            const offsetY = (nextCanvas.height - (size * scale)) / 2;
+
+            for (let r = 0; r < size; r++) {
+                for (let c = 0; c < matrix[r].length; c++) {
+                    if (matrix[r][c] !== 0) {
+                        nextCtx.fillStyle = nextPiece.color;
+                        nextCtx.fillRect(offsetX + c * scale + 1, offsetY + r * scale + 1, scale - 2, scale - 2);
+                        nextCtx.strokeStyle = "rgba(0,0,0,0.3)";
+                        nextCtx.strokeRect(offsetX + c * scale + 1, offsetY + r * scale + 1, scale - 2, scale - 2);
+                    }
+                }
+            }
+        }
+
+        function drawHeldPiece() {
+            holdCtx.fillStyle = '#020617';
+            holdCtx.fillRect(0, 0, holdCanvas.width, holdCanvas.height);
+
+            if (!heldPieceType) return;
+
+            const matrix = SHAPES[heldPieceType];
+            const size = matrix.length;
+            const scale = 20;
+
+            const offsetX = (holdCanvas.width - (matrix[0].length * scale)) / 2;
+            const offsetY = (holdCanvas.height - (size * scale)) / 2;
+
+            for (let r = 0; r < size; r++) {
+                for (let c = 0; c < matrix[r].length; c++) {
+                    if (matrix[r][c] !== 0) {
+                        holdCtx.fillStyle = COLORS[heldPieceType];
+                        holdCtx.fillRect(offsetX + c * scale + 1, offsetY + r * scale + 1, scale - 2, scale - 2);
+                        holdCtx.strokeStyle = "rgba(0,0,0,0.3)";
+                        holdCtx.strokeRect(offsetX + c * scale + 1, offsetY + r * scale + 1, scale - 2, scale - 2);
+                    }
+                }
+            }
+        }
+
+        function dropActivePiece() {
+            if (gameOver || isPaused) return;
+
+            if (!checkCollision(playerPiece.matrix, playerPiece.x, playerPiece.y + 1)) {
+                playerPiece.y++;
+                dropCounter = 0;
+            } else {
+                lockPiece();
+            }
+        }
+
+        function checkCollision(matrix, x, y) {
+            for (let r = 0; r < matrix.length; r++) {
+                for (let c = 0; c < matrix[r].length; c++) {
+                    if (matrix[r][c] !== 0) {
+                        const boardX = x + c;
+                        const boardY = y + r;
+
+                        // Check limits of border boundaries
+                        if (boardX < 0 || boardX >= COLS || boardY >= ROWS) {
+                            return true;
+                        }
+
+                        // Check collision with already locked grid cells
+                        if (boardY >= 0 && grid[boardY][boardX] !== 0) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        function lockPiece() {
+            for (let r = 0; r < playerPiece.matrix.length; r++) {
+                for (let c = 0; c < playerPiece.matrix[r].length; c++) {
+                    if (playerPiece.matrix[r][c] !== 0) {
+                        const boardY = playerPiece.y + r;
+                        const boardX = playerPiece.x + c;
+
+                        if (boardY < 0) {
+                            // Top-out condition reached
+                            triggerGameOver();
+                            return;
+                        }
+                        grid[boardY][boardX] = playerPiece.color;
+                    }
+                }
+            }
+
+            // Check for line clears
+            checkLineClears();
+
+            // Next Piece Spawn Cycle
+            playerPiece = nextPiece;
+            nextPiece = getRandomPiece();
+            hasSwapped = false; // reset swap lock
+            
+            drawNextPiece();
+
+            // Immediate secondary collision checks at spawn point
+            if (checkCollision(playerPiece.matrix, playerPiece.x, playerPiece.y)) {
+                triggerGameOver();
+            }
+        }
+
+        function checkLineClears() {
+            let cleared = 0;
+
+            for (let r = ROWS - 1; r >= 0; r--) {
+                const isLineFull = grid[r].every(val => val !== 0);
+                if (isLineFull) {
+                    cleared++;
+                    // Remove current row & append blank space row at the top
+                    grid.splice(r, 1);
+                    grid.unshift(new Array(COLS).fill(0));
+                    r++; // Readjust step index
+                }
+            }
+
+            if (cleared > 0) {
+                lines += cleared;
+                SFX.playClear();
+
+                // Dynamic classic Scoring rewards system
+                const scores = [0, 100, 300, 500, 800]; // Multiplier levels
+                score += (scores[cleared] || 1200) * level;
+
+                // Adjust Level speed thresholds
+                const newLevel = Math.floor(lines / 10) + 1;
+                if (newLevel > level) {
+                    level = newLevel;
+                    dropInterval = Math.max(100, 1000 - (level - 1) * 100); // Caps drop speed limit floor to 100ms
+                    SFX.playLevelUp();
+                }
+
+                saveHighScore();
+                updateScoreboards();
+            }
+        }
+
+        function updateScoreboards() {
+            document.getElementById("scoreVal").innerText = score.toString().padStart(5, '0');
+            document.getElementById("linesVal").innerText = lines;
+            document.getElementById("levelVal").innerText = level;
+        }
+
+        function triggerGameOver() {
+            gameOver = true;
+            document.getElementById("gameOverScreen").classList.remove("hidden");
+            SFX.playGameOver();
+            saveHighScore();
+        }
+
+        // Matrix Piece Rotator Algorithm
+        function rotateMatrix(matrix) {
+            const n = matrix.length;
+            const res = [];
+            for (let r = 0; r < n; r++) {
+                res.push(new Array(n).fill(0));
+            }
+            for (let r = 0; r < n; r++) {
+                for (let c = 0; c < n; c++) {
+                    res[c][n - 1 - r] = matrix[r][c];
+                }
+            }
+            return res;
+        }
+
+        function rotatePiece() {
+            if (gameOver || isPaused) return;
+
+            const originalMatrix = playerPiece.matrix;
+            const rotated = rotateMatrix(originalMatrix);
+
+            // Standard Wall-Kick detection adaptation logic
+            let offset = 0;
+            const maxKicks = 2; // basic left-right check parameters to ease tight turns near borders
+            
+            while (offset <= maxKicks) {
+                if (!checkCollision(rotated, playerPiece.x + offset, playerPiece.y)) {
+                    playerPiece.matrix = rotated;
+                    playerPiece.x += offset;
+                    SFX.playRotate();
+                    return;
+                }
+                if (!checkCollision(rotated, playerPiece.x - offset, playerPiece.y)) {
+                    playerPiece.matrix = rotated;
+                    playerPiece.x -= offset;
+                    SFX.playRotate();
+                    return;
+                }
+                offset++;
+            }
+        }
+
+        function swapHoldPiece() {
+            if (gameOver || isPaused || hasSwapped) return;
+
+            const typeToHold = playerPiece.type;
+
+            if (heldPieceType === null) {
+                // If nothing is held, pull the next piece and store the current
+                heldPieceType = typeToHold;
+                playerPiece = nextPiece;
+                nextPiece = getRandomPiece();
+                drawNextPiece();
+            } else {
+                // Swap the current piece with the held one
+                const temp = heldPieceType;
+                heldPieceType = typeToHold;
+                playerPiece = new Piece(temp);
+            }
+
+            hasSwapped = true;
+            SFX.playRotate();
+            drawHeldPiece();
+        }
+
+        function hardDrop() {
+            if (gameOver || isPaused) return;
+
+            let dropDistance = 0;
+            while (!checkCollision(playerPiece.matrix, playerPiece.x, playerPiece.y + 1)) {
+                playerPiece.y++;
+                dropDistance++;
+            }
+
+            // Bonus scores for immediate impact
+            score += dropDistance * 2;
+            updateScoreboards();
+
+            SFX.playMove();
+            lockPiece();
+        }
+
+        // Keyboard Actions Controller Handler mapping
+        window.addEventListener("keydown", (e) => {
+            if (e.key === "ArrowLeft") {
+                if (!checkCollision(playerPiece.matrix, playerPiece.x - 1, playerPiece.y)) {
+                    playerPiece.x--;
+                    SFX.playMove();
+                }
+            } else if (e.key === "ArrowRight") {
+                if (!checkCollision(playerPiece.matrix, playerPiece.x + 1, playerPiece.y)) {
+                    playerPiece.x++;
+                    SFX.playMove();
+                }
+            } else if (e.key === "ArrowDown") {
+                dropActivePiece();
+                SFX.playMove();
+            } else if (e.key === "ArrowUp" || e.key.toLowerCase() === 'x') {
+                e.preventDefault();
+                rotatePiece();
+            } else if (e.key === " ") {
+                e.preventDefault();
+                hardDrop();
+            } else if (e.key.toLowerCase() === "c" || e.key === "Shift") {
+                e.preventDefault();
+                swapHoldPiece();
+            } else if (e.key === "Escape" || e.key.toLowerCase() === "p") {
+                togglePause();
+            }
+        });
+
+        // Simulates keyboard action when mobile gamepad buttons are pressed
+        function triggerKeyAction(keyName) {
+            if (gameOver) return;
+
+            if (keyName === 'ArrowLeft') {
+                if (!checkCollision(playerPiece.matrix, playerPiece.x - 1, playerPiece.y)) {
+                    playerPiece.x--;
+                    SFX.playMove();
+                }
+            } else if (keyName === 'ArrowRight') {
+                if (!checkCollision(playerPiece.matrix, playerPiece.x + 1, playerPiece.y)) {
+                    playerPiece.x++;
+                    SFX.playMove();
+                }
+            } else if (keyName === 'ArrowDown') {
+                dropActivePiece();
+                SFX.playMove();
+            } else if (keyName === 'ArrowUp') {
+                rotatePiece();
+            } else if (keyName === ' ') {
+                hardDrop();
+            } else if (keyName === 'c') {
+                swapHoldPiece();
+            }
+        }
+    </script>
+</body>
+</html>
